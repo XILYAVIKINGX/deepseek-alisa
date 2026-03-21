@@ -10,7 +10,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Используем модель, которая точно существует (проверено вручную)
-MODEL_NAME = "google/gemini-2.0-flash-lite-001:free"  # альтернатива DeepSeek
+MODEL_NAME = "openrouter/auto"  # альтернатива DeepSeek
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
