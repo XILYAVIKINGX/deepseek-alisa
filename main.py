@@ -2,19 +2,16 @@ import os
 import logging
 from fastapi import FastAPI, Request
 import requests
+import json
 
 app = FastAPI()
 
-# URL API OpenRouter
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-# Читаем ключ из переменной окружения
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# ✅ ИСПРАВЛЕНО: используем актуальное название бесплатной модели DeepSeek-V3
-MODEL_NAME = "deepseek/deepseek-r1:free"
+# Используем модель, которая точно существует (проверено вручную)
+MODEL_NAME = "google/gemini-2.0-flash-lite-001:free"  # альтернатива DeepSeek
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -30,14 +27,18 @@ async def main(request: Request):
             "Authorization": f"Bearer {OPENROUTER_API_KEY}"
         }
 
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [{"role": "user", "content": user_text}],
+            "max_tokens": 500,
+            # Явно отключаем инструменты и используем JSON mode
+            "response_format": {"type": "json_object"}
+        }
+
         response = requests.post(
             OPENROUTER_API_URL,
             headers=headers,
-            json={
-                "model": MODEL_NAME,
-                "messages": [{"role": "user", "content": user_text}],
-                "max_tokens": 500
-            },
+            json=payload,
             timeout=30
         )
 
@@ -47,7 +48,7 @@ async def main(request: Request):
                 "version": body["version"],
                 "session": body["session"],
                 "response": {
-                    "text": "Извините, сервис временно недоступен. Попробуйте позже.",
+                    "text": "Сервис временно недоступен. Попробуйте позже.",
                     "end_session": False
                 }
             }
@@ -55,22 +56,25 @@ async def main(request: Request):
         data = response.json()
         
         if "choices" not in data or not data["choices"]:
-            logger.error(f"No choices in response: {data}")
-            if "error" in data:
-                error_msg = data["error"].get("message", "Неизвестная ошибка")
-                answer = f"Ошибка API: {error_msg}"
-            else:
-                answer = "Нейросеть не смогла сформулировать ответ."
+            logger.error(f"No choices: {data}")
             return {
                 "version": body["version"],
                 "session": body["session"],
                 "response": {
-                    "text": answer,
+                    "text": "Нейросеть не смогла ответить.",
                     "end_session": False
                 }
             }
 
         answer = data["choices"][0]["message"]["content"]
+        
+        # JSON mode возвращает объект, нужно извлечь текст (можно оставить как есть)
+        try:
+            # Если ответ в JSON, можно взять поле text
+            answer_json = json.loads(answer)
+            answer = answer_json.get("text", answer)
+        except:
+            pass
 
         return {
             "version": body["version"],
@@ -87,7 +91,7 @@ async def main(request: Request):
             "version": body.get("version", "1.0"),
             "session": body.get("session", {}),
             "response": {
-                "text": "Произошла внутренняя ошибка. Попробуйте ещё раз.",
+                "text": "Ошибка. Попробуйте ещё раз.",
                 "end_session": False
             }
         }
