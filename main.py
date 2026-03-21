@@ -5,10 +5,16 @@ import requests
 
 app = FastAPI()
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+# URL API OpenRouter
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Настройка логирования (логи будут видны в Render)
+# Читаем ключ из переменной окружения (на Render её нужно будет добавить)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Используем бесплатную модель DeepSeek-V3
+MODEL_NAME = "deepseek/deepseek-chat:free"
+
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -20,43 +26,48 @@ async def main(request: Request):
         user_text = body["request"]["original_utterance"]
         logger.info(f"User said: {user_text}")
 
-        # Отправляем запрос к DeepSeek API
+        # Формируем заголовки для OpenRouter
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}"
+        }
+
+        # Отправляем запрос к OpenRouter
         response = requests.post(
-            DEEPSEEK_API_URL,
-            headers={"Authorization": f"Bearer {DEEPSEEK_API_KEY}"},
+            OPENROUTER_API_URL,
+            headers=headers,
             json={
-                "model": "deepseek-chat",
+                "model": MODEL_NAME,
                 "messages": [{"role": "user", "content": user_text}],
+                "max_tokens": 500  # ограничиваем длину ответа для экономии
             },
             timeout=30
         )
 
         # Проверяем статус HTTP
         if response.status_code != 200:
-            logger.error(f"DeepSeek API error: {response.status_code} - {response.text}")
+            logger.error(f"OpenRouter error: {response.status_code} - {response.text}")
             return {
                 "version": body["version"],
                 "session": body["session"],
                 "response": {
-                    "text": "Извините, произошла ошибка при обращении к нейросети. Попробуйте позже.",
+                    "text": "Извините, сервис временно недоступен. Попробуйте позже.",
                     "end_session": False
                 }
             }
 
         data = response.json()
-        logger.info(f"DeepSeek response: {data}")
+        logger.info(f"OpenRouter response: {data}")
 
-        # Проверяем, есть ли поле choices
+        # Проверяем наличие поля choices
         if "choices" not in data or not data["choices"]:
-            # Если есть поле error — выводим его
+            logger.error(f"No choices in response: {data}")
+            # Если есть поле error, выводим его
             if "error" in data:
-                error_msg = data["error"].get("message", "Неизвестная ошибка API")
-                logger.error(f"DeepSeek API returned error: {error_msg}")
+                error_msg = data["error"].get("message", "Неизвестная ошибка")
                 answer = f"Ошибка API: {error_msg}"
             else:
-                logger.error(f"Unexpected response format: {data}")
-                answer = "Нейросеть вернула ответ в неожиданном формате."
-            # Возвращаем сообщение об ошибке в Алису
+                answer = "Нейросеть не смогла сформулировать ответ."
             return {
                 "version": body["version"],
                 "session": body["session"],
@@ -66,7 +77,7 @@ async def main(request: Request):
                 }
             }
 
-        # Безопасно извлекаем текст ответа
+        # Извлекаем текст ответа
         answer = data["choices"][0]["message"]["content"]
 
         return {
@@ -80,17 +91,15 @@ async def main(request: Request):
 
     except Exception as e:
         logger.exception("Unexpected error in webhook")
-        # В случае любой другой ошибки возвращаем вежливый ответ
         return {
             "version": body.get("version", "1.0"),
             "session": body.get("session", {}),
             "response": {
-                "text": "Извините, произошла внутренняя ошибка. Попробуйте ещё раз.",
+                "text": "Произошла внутренняя ошибка. Попробуйте ещё раз.",
                 "end_session": False
             }
         }
 
-# Опционально: GET эндпоинт для проверки здоровья (чтобы пинговать)
 @app.get("/")
 async def health():
     return {"status": "ok"}
