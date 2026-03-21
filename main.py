@@ -10,7 +10,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Используем модель, которая точно существует (проверено вручную)
-MODEL_NAME = "openrouter/auto"  # альтернатива DeepSeek
+MODEL_NAME = "meta-llama/llama-3.2-3b-instruct:free"  # альтернатива DeepSeek
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
