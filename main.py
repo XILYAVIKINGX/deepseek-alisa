@@ -32,7 +32,7 @@ async def main(request: Request):
             "messages": [{"role": "user", "content": user_text}],
             "max_tokens": 500,
             # Явно отключаем инструменты и используем JSON mode
-            "response_format": {"type": "json_object"}
+            # "response_format": {"type": "json_object"}
         }
 
         response = requests.post(
