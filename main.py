@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from openai import OpenAI
 
 # ================= НАСТРОЙКИ =================
-# API-ключ от RouterAI (обязательно добавить переменную окружения на Render)
+# API-ключ от RouterAI (должен быть добавлен в переменные окружения на Render)
 ROUTERAI_API_KEY = os.getenv("ROUTERAI_API_KEY")
 
 # Инициализация клиента OpenAI-совместимого API RouterAI
@@ -13,16 +13,16 @@ client = OpenAI(
     base_url="https://api.routerai.ru/v1"
 )
 
-# Идентификатор модели DeepSeek (уточните актуальный в личном кабинете RouterAI)
-MODEL_NAME = "deepseek/deepseek-v4-pro"
+# Идентификатор модели DeepSeek (уточните актуальный ID в личном кабинете RouterAI)
+MODEL_NAME = "deepseek/deepseek-v3.2"
 
-# Предпочитаемый провайдер – DeepSeek
+# Предпочитаемый провайдер
 PREFERRED_PROVIDER = "deepseek"
 # =============================================
 
 app = FastAPI()
 
-# Настройка логирования (логи будут видны в Render)
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -35,14 +35,17 @@ async def handle_alice_request(request: Request):
         user_text = body["request"]["original_utterance"]
         logger.info(f"Пользователь сказал: {user_text}")
 
-        # 2. Формируем запрос к RouterAI с указанием провайдера
+        # 2. Формируем параметры запроса к RouterAI
         completion_params = {
             "model": MODEL_NAME,
             "messages": [{"role": "user", "content": user_text}],
-            "max_tokens": 500,                      # ограничиваем длину ответа
-            "provider": {
-                "order": [PREFERRED_PROVIDER],      # сначала DeepSeek
-                "allow_fallbacks": False            # не переключаться на других провайдеров при ошибке
+            "max_tokens": 500,
+            # Используем extra_body для кастомных параметров (поддержка provider)
+            "extra_body": {
+                "provider": {
+                    "order": [PREFERRED_PROVIDER],
+                    "allow_fallbacks": False
+                }
             }
         }
 
@@ -53,7 +56,7 @@ async def handle_alice_request(request: Request):
         answer = response.choices[0].message.content
         logger.info(f"Ассистент ответил: {answer}")
 
-        # 5. Возвращаем ответ в формате, понятном Алисе
+        # 5. Возвращаем ответ в формате Алисы
         return {
             "version": body["version"],
             "session": body["session"],
@@ -65,7 +68,6 @@ async def handle_alice_request(request: Request):
 
     except Exception as e:
         logger.exception("Ошибка при обработке запроса")
-        # В случае любой ошибки возвращаем вежливый ответ
         return {
             "version": body.get("version", "1.0"),
             "session": body.get("session", {}),
@@ -78,5 +80,5 @@ async def handle_alice_request(request: Request):
 
 @app.get("/")
 async def health_check():
-    """Эндпоинт для проверки работоспособности (нужен для пинга)"""
+    """Эндпоинт для проверки работоспособности (для пинга)"""
     return {"status": "ok"}
