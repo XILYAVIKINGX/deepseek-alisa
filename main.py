@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 ROUTERAI_API_KEY = os.getenv("ROUTERAI_API_KEY")
-MODEL_NAME = "deepseek/deepseek-v4-pro"   # или попробуйте meta-llama/llama-3.2-3b-instruct:free
+MODEL_NAME = "deepseek/deepseek-chat"   # или попробуйте meta-llama/llama-3.2-3b-instruct:free
 PREFERRED_PROVIDER = "deepseek"
 
 @app.post("/")
