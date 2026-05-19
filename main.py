@@ -1,81 +1,59 @@
 import os
 import logging
 from fastapi import FastAPI, Request
-import requests
-import json
+from openai import OpenAI
+
+# ================= НАСТРОЙКИ =================
+# API-ключ от RouterAI (обязательно добавить переменную окружения на Render)
+ROUTERAI_API_KEY = os.getenv("ROUTERAI_API_KEY")
+
+# Инициализация клиента OpenAI-совместимого API RouterAI
+client = OpenAI(
+    api_key=ROUTERAI_API_KEY,
+    base_url="https://api.routerai.ru/v1"
+)
+
+# Идентификатор модели DeepSeek (уточните актуальный в личном кабинете RouterAI)
+MODEL_NAME = "deepseek/deepseek-v4-pro"
+
+# Предпочитаемый провайдер – DeepSeek
+PREFERRED_PROVIDER = "deepseek"
+# =============================================
 
 app = FastAPI()
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# Используем модель, которая точно существует (проверено вручную)
-MODEL_NAME = "openrouter/free"  # альтернатива DeepSeek
-
+# Настройка логирования (логи будут видны в Render)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 @app.post("/")
-async def main(request: Request):
+async def handle_alice_request(request: Request):
     try:
+        # 1. Получаем текст от Алисы
         body = await request.json()
         user_text = body["request"]["original_utterance"]
-        logger.info(f"User said: {user_text}")
+        logger.info(f"Пользователь сказал: {user_text}")
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}"
-        }
-
-        payload = {
+        # 2. Формируем запрос к RouterAI с указанием провайдера
+        completion_params = {
             "model": MODEL_NAME,
             "messages": [{"role": "user", "content": user_text}],
-            "max_tokens": 500,
-            # Явно отключаем инструменты и используем JSON mode
-            # "response_format": {"type": "json_object"}
+            "max_tokens": 500,                      # ограничиваем длину ответа
+            "provider": {
+                "order": [PREFERRED_PROVIDER],      # сначала DeepSeek
+                "allow_fallbacks": False            # не переключаться на других провайдеров при ошибке
+            }
         }
 
-        response = requests.post(
-            OPENROUTER_API_URL,
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
+        # 3. Отправляем запрос
+        response = client.chat.completions.create(**completion_params)
 
-        if response.status_code != 200:
-            logger.error(f"OpenRouter error: {response.status_code} - {response.text}")
-            return {
-                "version": body["version"],
-                "session": body["session"],
-                "response": {
-                    "text": "Сервис временно недоступен. Попробуйте позже.",
-                    "end_session": False
-                }
-            }
+        # 4. Извлекаем ответ нейросети
+        answer = response.choices[0].message.content
+        logger.info(f"Ассистент ответил: {answer}")
 
-        data = response.json()
-        
-        if "choices" not in data or not data["choices"]:
-            logger.error(f"No choices: {data}")
-            return {
-                "version": body["version"],
-                "session": body["session"],
-                "response": {
-                    "text": "Нейросеть не смогла ответить.",
-                    "end_session": False
-                }
-            }
-
-        answer = data["choices"][0]["message"]["content"]
-        
-        # JSON mode возвращает объект, нужно извлечь текст (можно оставить как есть)
-        try:
-            # Если ответ в JSON, можно взять поле text
-            answer_json = json.loads(answer)
-            answer = answer_json.get("text", answer)
-        except:
-            pass
-
+        # 5. Возвращаем ответ в формате, понятном Алисе
         return {
             "version": body["version"],
             "session": body["session"],
@@ -86,16 +64,19 @@ async def main(request: Request):
         }
 
     except Exception as e:
-        logger.exception("Unexpected error")
+        logger.exception("Ошибка при обработке запроса")
+        # В случае любой ошибки возвращаем вежливый ответ
         return {
             "version": body.get("version", "1.0"),
             "session": body.get("session", {}),
             "response": {
-                "text": "Ошибка. Попробуйте ещё раз.",
+                "text": "Извините, произошла ошибка. Попробуйте ещё раз.",
                 "end_session": False
             }
         }
 
+
 @app.get("/")
-async def health():
+async def health_check():
+    """Эндпоинт для проверки работоспособности (нужен для пинга)"""
     return {"status": "ok"}
