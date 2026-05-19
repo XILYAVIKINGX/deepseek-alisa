@@ -13,7 +13,7 @@ client = OpenAI(
 
 # Используем быструю и стабильную модель
 # Альтернативные варианты: "google/gemini-2.0-flash-lite-001:free"
-MODEL_NAME = "meta-llama/llama-3.2-3b-instruct:free"
+MODEL_NAME = "deepseek/deepseek-chat"
 # =============================================
 
 app = FastAPI()
