@@ -13,7 +13,7 @@ client = OpenAI(
     base_url="https://routerai.ru/api/v1"
 )
 
-MODEL_NAME = "deepseek/deepseek-v3.2"   # уточните актуальное имя модели в RouterAI
+MODEL_NAME = "deepseek/deepseek-v4-pro"   # уточните актуальное имя модели в RouterAI
 PREFERRED_PROVIDER = "deepseek"
 # =============================================
 
